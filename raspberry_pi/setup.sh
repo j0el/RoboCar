@@ -46,7 +46,9 @@ fi
 
 echo "==> Authenticating gh with GitHub"
 if ! gh auth status >/dev/null 2>&1; then
-    gh auth login
+    # Pin protocol to https + web flow so gh never prompts about SSH keys
+    # (it only asks those questions when the ssh protocol is selected).
+    gh auth login --hostname github.com --git-protocol https --web
 else
     echo "    gh already authenticated, skipping"
 fi
