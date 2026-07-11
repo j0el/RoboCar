@@ -123,15 +123,15 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
 
 | File                      | Runs on | Purpose                                    |
 |---------------------------|---------|--------------------------------------------|
-| `pico_pi/pico_motor_controller.py`| Pico | MicroPython firmware: serial → motor PWM |
-| `cone_follower.py`        | Pi 4    | Vision + state machine + serial commands   |
-| `hsv_tuner.py`            | Pi 4    | Browser-based live tuning of orange range  |
+| `pico_pi/pico_motor_controller.py`      | Pico | MicroPython firmware: serial → motor PWM |
+| `raspberry_pi/cone_follower.py`         | Pi 4 | Vision + state machine + serial commands |
+| `raspberry_pi/hsv_tuner.py`             | Pi 4 | Browser-based live tuning of orange range|
 
 ## 7. Bring-up order (do these in sequence)
 
 0. **Pi OS setup.** On a fresh Raspberry Pi OS Lite 64-bit install, run
    `raspberry_pi/setup.sh` (installs git, python3, gh, uv; runs
-   `gh auth login`). Then `gh repo clone <you>/RoboCar`, `cd RoboCar`,
+   `gh auth login`). Then `gh repo clone <you>/RoboCar`, `cd RoboCar/raspberry_pi`,
    `uv sync` to install opencv-python/pyserial/numpy.
 1. **Pico pins.** Open Adeept's lesson code for your kit and copy the motor pin
    numbers into the `PINS` table at the top of `pico_pi/pico_motor_controller.py`.
@@ -140,11 +140,13 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
    `python3 -c "import serial,time; s=serial.Serial('/dev/ttyACM0',115200); s.write(b'V 30 0 0\n'); time.sleep(2); s.write(b'V 0 0 0\n')"`
    All four wheels should spin forward. Flip DIRECTION flags for any that don't.
    Then test strafe (`V 0 30 0`) and yaw (`V 0 0 30`).
-3. **Tune orange.** Place cones where the robot will run. Run `hsv_tuner.py`,
-   open the shown URL in a browser, adjust sliders until cones are solid white
-   and everything else black. Copy the printed values into `cone_follower.py`.
-4. **Dry run.** Run `cone_follower.py --dry-run` (prints decisions, no motion)
-   and carry the robot around by hand to sanity-check detections and states.
+3. **Tune orange.** Place cones where the robot will run. From `raspberry_pi/`,
+   run `uv run python hsv_tuner.py`, open the shown URL in a browser, adjust
+   sliders until cones are solid white and everything else black. Copy the
+   printed values into `cone_follower.py`.
+4. **Dry run.** From `raspberry_pi/`, run `uv run python cone_follower.py
+   --dry-run` (prints decisions, no motion) and carry the robot around by hand
+   to sanity-check detections and states.
 5. **Low-speed live run.** Default speeds are gentle. Widen the standoff and
    raise speed only after it reliably makes full laps.
 

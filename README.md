@@ -26,20 +26,25 @@ Full design details, serial protocol, control law, and bring-up checklist are in
 ## Repository contents
 
 - `ARCHITECTURE.md` — system design, protocol, vision pipeline, behavior state machine
-- `pico_pi/pico_motor_controller.py` — MicroPython firmware for the Pico (flash
-  as `main.py`); parses velocity commands, mecanum mixing, PWM output, 0.5 s
-  safety watchdog
-- `cone_follower.py` — main Pi program: camera capture, HSV cone detection,
-  SEARCH → FOLLOW → LOST state machine, serial output
-- `hsv_tuner.py` — browser-based live tuning of the orange HSV range
-  (the Pi stays headless; open `http://<pi-ip>:8000`)
+- `pico_pi/` — everything that runs on the Pico. `pico_motor_controller.py` is
+  the MicroPython firmware (flash as `main.py`); parses velocity commands,
+  mecanum mixing, PWM output, 0.5 s safety watchdog. Also holds bench-test
+  and WiFi/ESP01 bring-up scripts.
+- `raspberry_pi/` — everything that runs on the Pi. `cone_follower.py` is the
+  main program: camera capture, HSV cone detection, SEARCH → FOLLOW → LOST
+  state machine, serial output. `hsv_tuner.py` is browser-based live tuning
+  of the orange HSV range (the Pi stays headless; open `http://<pi-ip>:8000`).
+  `setup.sh` provisions a fresh Pi OS install; `pyproject.toml` declares the
+  Python deps, installed with `uv sync`.
+- `android_controller/` — Android app for manual WiFi driving.
 
 ## Quick start
 
-On the Pi:
+On the Pi (after `raspberry_pi/setup.sh`, see `raspberry_pi/README.md`):
 
 ```bash
-sudo apt install python3-opencv python3-serial python3-numpy
+cd raspberry_pi
+uv sync
 ```
 
 1. Edit the `PINS` table in `pico_pi/pico_motor_controller.py` to match the Adeept
@@ -47,9 +52,10 @@ sudo apt install python3-opencv python3-serial python3-numpy
    flash it to the Pico as `main.py`.
 2. Bench-test with wheels off the ground; flip any `DIRECTION` flag for a
    wheel spinning the wrong way.
-3. Run `python3 hsv_tuner.py`, tune until cones are solid white in the mask,
-   and copy the values into `HSV_LOW` / `HSV_HIGH` in `cone_follower.py`.
-4. `python3 cone_follower.py --dry-run` to verify decisions, then run live.
+3. From `raspberry_pi/`, run `uv run python hsv_tuner.py`, tune until cones
+   are solid white in the mask, and copy the values into `HSV_LOW` /
+   `HSV_HIGH` in `cone_follower.py`.
+4. `uv run python cone_follower.py --dry-run` to verify decisions, then run live.
 
 ## Status
 

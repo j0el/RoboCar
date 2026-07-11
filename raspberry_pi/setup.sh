@@ -50,7 +50,7 @@ cat <<'EOF'
 
 ==> Done. Next steps:
   1. Clone the repo:       gh repo clone <your-github-username>/RoboCar
-  2. cd RoboCar
+  2. cd RoboCar/raspberry_pi
   3. Install Python deps:  uv sync
   4. Sanity-check vision:  uv run python hsv_tuner.py
 EOF
