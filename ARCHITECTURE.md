@@ -129,6 +129,10 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
 
 ## 7. Bring-up order (do these in sequence)
 
+0. **Pi OS setup.** On a fresh Raspberry Pi OS Lite 64-bit install, run
+   `raspberry_pi/setup.sh` (installs git, python3, gh, uv; runs
+   `gh auth login`). Then `gh repo clone <you>/RoboCar`, `cd RoboCar`,
+   `uv sync` to install opencv-python/pyserial/numpy.
 1. **Pico pins.** Open Adeept's lesson code for your kit and copy the motor pin
    numbers into the `PINS` table at the top of `pico_motor_controller.py`.
    Flash it to the Pico (Thonny or mpremote, saved as `main.py`).

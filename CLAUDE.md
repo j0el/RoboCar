@@ -24,6 +24,11 @@ protocol, mecanum mixing, vision pipeline, state machine, bring-up checklist.
 - `cone_follower.py` — main Pi program. OpenCV HSV cone detection,
   SEARCH/FOLLOW/LOST state machine, 20 Hz command stream. Has `--dry-run`.
 - `hsv_tuner.py` — browser-based HSV tuning at http://<pi-ip>:8000 (Pi is headless).
+- `pyproject.toml` — Pi-side Python deps (opencv-python, pyserial, numpy),
+  installed with `uv sync`.
+- `raspberry_pi/setup.sh` — one-time Pi provisioning (git, python3, gh, uv;
+  `gh auth login` for GitHub access). Run once on a fresh Raspberry Pi OS
+  install, before cloning the repo.
 
 ## Current state / immediate next step
 
@@ -32,7 +37,7 @@ The code is written but **not yet run on hardware**. The blocker:
 1. **The `PINS` table in `pico_motor_controller.py` contains PLACEHOLDER GPIO
    numbers.** The real motor pin assignments must be copied from Adeept's
    lesson/sample code. The Adeept docs and code are on this machine at:
-   `~/Dropbox/ADR032-Omni-directional_Mecanum_Wheels_Robotic_Car_Kit_for_Pico-20260413`
+   `~/Desktop/ADR032-Omni-directional_Mecanum_Wheels_Robotic_Car_Kit_for_Pico-20260413`
    → Find the motor driver pin definitions in their MicroPython lesson code
    (likely a motor.py / move.py or similar in the sample code). Note whether the
    board uses PWM+IN1+IN2 per motor or two-PWM (IN1/IN2 both PWM) drive — the
@@ -46,8 +51,10 @@ The code is written but **not yet run on hardware**. The blocker:
 
 ## Conventions
 
-- Pi-side code: Python 3, only apt-installable deps (python3-opencv,
-  python3-serial, python3-numpy). Keep it lightweight — the Pi has 2GB RAM.
+- Pi-side code: Python 3, deps managed with `uv` against the root
+  `pyproject.toml` (opencv-python, pyserial, numpy — install with
+  `uv sync`, run with `uv run python <script>.py`), not apt. Keep it
+  lightweight — the Pi has 2GB RAM.
 - Pico-side: MicroPython, single-file firmware, no external libs.
 - Coordinate/sign conventions (do not change without updating both sides and
   ARCHITECTURE.md): vx + = forward, vy + = strafe right, w + = CCW yaw.
