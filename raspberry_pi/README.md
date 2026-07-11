@@ -5,7 +5,7 @@ the vision/behavior programs, and their Python deps. See `../CLAUDE.md`
 and `../ARCHITECTURE.md` for what runs here and why.
 
 - `setup.sh` — one-time OS-level provisioning (see below).
-- `pyproject.toml` — Python deps (opencv-python, pyserial, numpy), installed
+- `pyproject.toml` — Python deps (opencv-python-headless, pyserial, numpy), installed
   with `uv sync` run from this directory.
 - `cone_follower.py` — main program: camera capture, HSV cone detection,
   SEARCH/FOLLOW/LOST state machine, serial output to the Pico.
@@ -28,7 +28,7 @@ official installer script (not apt — Raspberry Pi OS doesn't package it).
 Then runs `gh auth login` so you can clone/push over HTTPS with a browser
 device code, no manual SSH key to generate or upload.
 
-Python *libraries* (opencv-python, pyserial, numpy) are intentionally not
+Python *libraries* (opencv-python-headless, pyserial, numpy) are intentionally not
 installed by this script — they're managed by `uv` via `pyproject.toml`
 in this same directory (`cd raspberry_pi && uv sync`, see next steps
 printed at the end of the script).

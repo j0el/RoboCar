@@ -29,7 +29,7 @@ protocol, mecanum mixing, vision pipeline, state machine, bring-up checklist.
     SEARCH/FOLLOW/LOST state machine, 20 Hz command stream. Has `--dry-run`.
   - `hsv_tuner.py` — browser-based HSV tuning at http://<pi-ip>:8000 (Pi is headless).
   - `movement_test.py` — bench-test script that drives fixed moves over serial.
-  - `pyproject.toml` — Pi-side Python deps (opencv-python, pyserial, numpy),
+  - `pyproject.toml` — Pi-side Python deps (opencv-python-headless, pyserial, numpy),
     installed with `uv sync` (run from inside `raspberry_pi/`).
   - `setup.sh` — one-time Pi provisioning (git, python3, gh, uv; `gh auth
     login` for GitHub access). Run once on a fresh Raspberry Pi OS install,
@@ -57,7 +57,7 @@ The code is written but **not yet run on hardware**. The blocker:
 ## Conventions
 
 - Pi-side code: Python 3, deps managed with `uv` against
-  `raspberry_pi/pyproject.toml` (opencv-python, pyserial, numpy — install
+  `raspberry_pi/pyproject.toml` (opencv-python-headless, pyserial, numpy — install
   with `uv sync`, run with `uv run python <script>.py` from inside
   `raspberry_pi/`), not apt. Keep it lightweight — the Pi has 2GB RAM.
 - Pico-side: MicroPython, single-file firmware, no external libs.

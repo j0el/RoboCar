@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
 # One-time provisioning script for a fresh Raspberry Pi OS Lite 64-bit install.
 # Installs git, python3, the GitHub CLI (gh), and uv (Python package/venv
-# manager). Python *libraries* (opencv-python, pyserial, numpy) are installed
-# later via `uv sync` against the repo's pyproject.toml, not via apt.
+# manager). Python *libraries* (opencv-python-headless, pyserial, numpy) are
+# installed later via `uv sync` against the repo's pyproject.toml, not via
+# apt. We use the headless OpenCV build (no imshow/GUI in this codebase, and
+# the Pi is headless anyway) specifically so it doesn't pull in libGL/X11/GTK
+# at all; libgomp1 below is the one native shared library those wheels still
+# need (OpenMP runtime for numpy/opencv's linear algebra and threading).
 set -euo pipefail
 
 echo "==> Updating apt package index"
 sudo apt-get update
 
-echo "==> Installing base packages (git, python3, curl, ca-certificates)"
+echo "==> Installing base packages (git, python3, curl, ca-certificates, libgomp1)"
 sudo apt-get install -y --no-install-recommends \
     git \
     python3 \
     ca-certificates \
-    curl
+    curl \
+    libgomp1
 
 echo "==> Installing GitHub CLI (gh)"
 if ! command -v gh >/dev/null 2>&1; then

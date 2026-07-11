@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Pi-side vision and control code for the Adeept Mecanum cone runner"
 requires-python = ">=3.11"
 dependencies = [
-    "opencv-python>=4.9",
+    "opencv-python-headless>=4.9",
     "numpy>=1.26",
     "pyserial>=3.5",
 ]
