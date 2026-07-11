@@ -18,9 +18,12 @@ protocol, mecanum mixing, vision pipeline, state machine, bring-up checklist.
 ## Files
 
 - `ARCHITECTURE.md` — authoritative design doc. Keep it updated when design changes.
-- `pico_motor_controller.py` — MicroPython firmware, flashed to the Pico as
-  `main.py`. Serial protocol `V vx vy w\n` (each -100..100), mecanum mixing,
-  0.5 s watchdog stop.
+- `pico_pi/` — everything that runs on the Pico. `pico_motor_controller.py` is
+  the MicroPython firmware, flashed to the Pico as `main.py`. Serial protocol
+  `V vx vy w\n` (each -100..100), mecanum mixing, 0.5 s watchdog stop. Also
+  holds bench-test/bring-up scripts (`motor_test_individual.py`,
+  `pico_movement_test.py`) and WiFi/ESP01 experiments (`pico_esp01_test.py`,
+  `pico_esp01_diag.py`, `pico_wifi_drive.py`).
 - `cone_follower.py` — main Pi program. OpenCV HSV cone detection,
   SEARCH/FOLLOW/LOST state machine, 20 Hz command stream. Has `--dry-run`.
 - `hsv_tuner.py` — browser-based HSV tuning at http://<pi-ip>:8000 (Pi is headless).
@@ -34,7 +37,7 @@ protocol, mecanum mixing, vision pipeline, state machine, bring-up checklist.
 
 The code is written but **not yet run on hardware**. The blocker:
 
-1. **The `PINS` table in `pico_motor_controller.py` contains PLACEHOLDER GPIO
+1. **The `PINS` table in `pico_pi/pico_motor_controller.py` contains PLACEHOLDER GPIO
    numbers.** The real motor pin assignments must be copied from Adeept's
    lesson/sample code. The Adeept docs and code are on this machine at:
    `~/Desktop/ADR032-Omni-directional_Mecanum_Wheels_Robotic_Car_Kit_for_Pico-20260413`

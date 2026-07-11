@@ -26,8 +26,9 @@ Full design details, serial protocol, control law, and bring-up checklist are in
 ## Repository contents
 
 - `ARCHITECTURE.md` — system design, protocol, vision pipeline, behavior state machine
-- `pico_motor_controller.py` — MicroPython firmware for the Pico (flash as `main.py`);
-  parses velocity commands, mecanum mixing, PWM output, 0.5 s safety watchdog
+- `pico_pi/pico_motor_controller.py` — MicroPython firmware for the Pico (flash
+  as `main.py`); parses velocity commands, mecanum mixing, PWM output, 0.5 s
+  safety watchdog
 - `cone_follower.py` — main Pi program: camera capture, HSV cone detection,
   SEARCH → FOLLOW → LOST state machine, serial output
 - `hsv_tuner.py` — browser-based live tuning of the orange HSV range
@@ -41,7 +42,7 @@ On the Pi:
 sudo apt install python3-opencv python3-serial python3-numpy
 ```
 
-1. Edit the `PINS` table in `pico_motor_controller.py` to match the Adeept
+1. Edit the `PINS` table in `pico_pi/pico_motor_controller.py` to match the Adeept
    expansion board (copy pin numbers from Adeept's motor lesson code), then
    flash it to the Pico as `main.py`.
 2. Bench-test with wheels off the ground; flip any `DIRECTION` flag for a

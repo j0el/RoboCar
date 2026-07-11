@@ -123,7 +123,7 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
 
 | File                      | Runs on | Purpose                                    |
 |---------------------------|---------|--------------------------------------------|
-| `pico_motor_controller.py`| Pico    | MicroPython firmware: serial → motor PWM   |
+| `pico_pi/pico_motor_controller.py`| Pico | MicroPython firmware: serial → motor PWM |
 | `cone_follower.py`        | Pi 4    | Vision + state machine + serial commands   |
 | `hsv_tuner.py`            | Pi 4    | Browser-based live tuning of orange range  |
 
@@ -134,7 +134,7 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
    `gh auth login`). Then `gh repo clone <you>/RoboCar`, `cd RoboCar`,
    `uv sync` to install opencv-python/pyserial/numpy.
 1. **Pico pins.** Open Adeept's lesson code for your kit and copy the motor pin
-   numbers into the `PINS` table at the top of `pico_motor_controller.py`.
+   numbers into the `PINS` table at the top of `pico_pi/pico_motor_controller.py`.
    Flash it to the Pico (Thonny or mpremote, saved as `main.py`).
 2. **Bench test motors.** Wheels off the ground. From the Pi:
    `python3 -c "import serial,time; s=serial.Serial('/dev/ttyACM0',115200); s.write(b'V 30 0 0\n'); time.sleep(2); s.write(b'V 0 0 0\n')"`
