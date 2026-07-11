@@ -26,6 +26,8 @@ from machine import Pin, PWM
 # Pins from Adeept lesson code (06_motor.py / pico_car.py):
 #   M1=FL  M2=FR
 #   M4=BL  M3=BR
+# left front wheel M1
+
 PINS = {
     #            in1  in2
     "FL": dict(in1=12, in2=13),  # front-left  (M1)
