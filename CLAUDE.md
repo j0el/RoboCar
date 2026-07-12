@@ -22,13 +22,16 @@ protocol, mecanum mixing, vision pipeline, state machine, bring-up checklist.
   the MicroPython firmware, flashed to the Pico as `main.py`. Serial protocol
   `V vx vy w\n` (each -100..100), mecanum mixing, 0.5 s watchdog stop. Also
   holds bench-test/bring-up scripts (`motor_test_individual.py`,
-  `pico_movement_test.py`) and WiFi/ESP01 experiments (`pico_esp01_test.py`,
+  `pico_movement_test.py`, `pico_serial_echo_test.py` — USB serial link test,
+  no motors) and WiFi/ESP01 experiments (`pico_esp01_test.py`,
   `pico_esp01_diag.py`, `pico_wifi_drive.py`).
 - `raspberry_pi/` — everything that runs on the Pi.
   - `cone_follower.py` — main Pi program. OpenCV HSV cone detection,
     SEARCH/FOLLOW/LOST state machine, 20 Hz command stream. Has `--dry-run`.
   - `hsv_tuner.py` — browser-based HSV tuning at http://<pi-ip>:8000 (Pi is headless).
   - `movement_test.py` — bench-test script that drives fixed moves over serial.
+  - `serial_ping_test.py` — pairs with `pico_pi/pico_serial_echo_test.py` to
+    verify the Pi<->Pico USB serial link before testing motors.
   - `pyproject.toml` — Pi-side Python deps (opencv-python-headless, pyserial, numpy),
     installed with `uv sync` (run from inside `raspberry_pi/`).
   - `setup.sh` — one-time Pi provisioning (git, python3, gh, uv; `gh auth

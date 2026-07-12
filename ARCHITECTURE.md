@@ -144,6 +144,12 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
    USB port and the kit's battery pack simultaneously — the Pico's onboard
    diode is designed for this, but it's worth a sanity check against the
    Adeept expansion board's power routing the first time.
+
+   Verify the link itself before involving motors: run
+   `pico_pi/pico_serial_echo_test.py` on the Pico (Thonny "Run", don't save
+   as `main.py`), then from `raspberry_pi/`, `uv run python
+   serial_ping_test.py`. It sends `PING` a few times and confirms `PONG`
+   comes back on `/dev/ttyACM0`.
 2. **Bench test motors.** Wheels off the ground. From the Pi:
    `python3 -c "import serial,time; s=serial.Serial('/dev/ttyACM0',115200); s.write(b'V 30 0 0\n'); time.sleep(2); s.write(b'V 0 0 0\n')"`
    All four wheels should spin forward. Flip DIRECTION flags for any that don't.
