@@ -29,9 +29,11 @@ except ImportError:
 # node; "...-video-index1" is UVC metadata-only, not usable for capture).
 CAMERA_DEVICE = "/dev/v4l/by-id/usb-Innomaker_Innomaker-U20CAM-720P_SN0001-video-index0"
 
-# HSV bounds for orange — REPLACE with values from hsv_tuner.py
-HSV_LOW  = (5, 120, 90)
-HSV_HIGH = (20, 255, 255)
+# HSV bounds for orange, tuned with hsv_tuner.py. Wide H range (up to 67)
+# risks catching yellow/green clutter if it shows up in frame later --
+# retest with hsv_tuner.py if false positives appear outside the cone.
+HSV_LOW  = (0, 46, 239)
+HSV_HIGH = (67, 171, 255)
 
 FRAME_W, FRAME_H = 640, 480
 MIN_CONE_AREA = 300        # px^2, rejects speckle

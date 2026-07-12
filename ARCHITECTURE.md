@@ -136,6 +136,14 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
 1. **Pico pins.** Open Adeept's lesson code for your kit and copy the motor pin
    numbers into the `PINS` table at the top of `pico_pi/pico_motor_controller.py`.
    Flash it to the Pico (Thonny or mpremote, saved as `main.py`).
+1.5. **Connect Pi ↔ Pico.** Plain USB cable, Pico's micro-USB port to any Pi
+   USB-A port — no GPIO wiring, no WiFi. The firmware talks over the Pico's
+   native USB CDC serial (`sys.stdin`/`print`, see `pico_motor_controller.py`),
+   the same port Thonny uses. Shows up on the Pi as `/dev/ttyACM0` (check
+   with `ls /dev/ttyACM*`). The Pico will then be powered from both the Pi's
+   USB port and the kit's battery pack simultaneously — the Pico's onboard
+   diode is designed for this, but it's worth a sanity check against the
+   Adeept expansion board's power routing the first time.
 2. **Bench test motors.** Wheels off the ground. From the Pi:
    `python3 -c "import serial,time; s=serial.Serial('/dev/ttyACM0',115200); s.write(b'V 30 0 0\n'); time.sleep(2); s.write(b'V 0 0 0\n')"`
    All four wheels should spin forward. Flip DIRECTION flags for any that don't.
