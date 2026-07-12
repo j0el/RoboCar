@@ -5,12 +5,10 @@ cone_follower.py — runs on the Raspberry Pi 4.
 Detects orange cones with the USB camera and drives counterclockwise around
 the OUTSIDE of the cone cluster (cones stay on the robot's left).
 
-Usage:
-    python3 cone_follower.py                 # live run
-    python3 cone_follower.py --dry-run       # print decisions, no motors
-    python3 cone_follower.py --port /dev/ttyACM0
-
-Requires: sudo apt install python3-opencv python3-serial python3-numpy
+Usage (from raspberry_pi/, deps installed via `uv sync`):
+    uv run python cone_follower.py                 # live run
+    uv run python cone_follower.py --dry-run       # print decisions, no motors
+    uv run python cone_follower.py --port /dev/ttyACM0
 """
 
 import argparse
@@ -24,6 +22,13 @@ except ImportError:
     serial = None
 
 # ---------------- TUNABLES ----------------
+# Camera device: a /dev/videoN index isn't stable (the Pi 4's onboard
+# bcm2835 codec/ISP nodes and camera nodes can renumber across boots/
+# replugs). Use the udev by-id symlink instead — find yours with
+# `ls -l /dev/v4l/by-id/` (the "...-video-index0" entry is the capture
+# node; "...-video-index1" is UVC metadata-only, not usable for capture).
+CAMERA_DEVICE = "/dev/v4l/by-id/usb-Innomaker_Innomaker-U20CAM-720P_SN0001-video-index0"
+
 # HSV bounds for orange — REPLACE with values from hsv_tuner.py
 HSV_LOW  = (5, 120, 90)
 HSV_HIGH = (20, 255, 255)
@@ -63,14 +68,14 @@ class PicoLink:
 
 
 def open_camera():
-    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+    cap = cv2.VideoCapture(CAMERA_DEVICE, cv2.CAP_V4L2)
     # MJPG is essential: raw YUYV at 720p won't fit through USB 2.0 at speed
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_W)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_H)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)   # always process the freshest frame
     if not cap.isOpened():
-        raise RuntimeError("Camera not found at /dev/video0")
+        raise RuntimeError(f"Camera not found at {CAMERA_DEVICE}")
     return cap
 
 

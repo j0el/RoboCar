@@ -2,7 +2,8 @@
 """
 hsv_tuner.py — tune the orange HSV range from any browser (Pi stays headless).
 
-Run on the Pi:   python3 hsv_tuner.py
+Run on the Pi (from raspberry_pi/, deps installed via `uv sync`):
+                 uv run python hsv_tuner.py
 Then open:       http://<pi-ip>:8000
 Left image = camera, right = mask. Adjust sliders until the cones are solid
 white and everything else is black. Current values print in the page and the
@@ -17,6 +18,9 @@ from urllib.parse import urlparse, parse_qs
 import cv2
 import numpy as np
 
+# See cone_follower.py's CAMERA_DEVICE comment: a raw /dev/videoN index
+# isn't stable across boots/replugs, so use the udev by-id symlink.
+CAMERA_DEVICE = "/dev/v4l/by-id/usb-Innomaker_Innomaker-U20CAM-720P_SN0001-video-index0"
 W, H = 640, 480
 vals = {"hl": 5, "sl": 120, "vl": 90, "hh": 20, "sh": 255, "vh": 255}
 lock = threading.Lock()
@@ -51,7 +55,7 @@ show();
 
 
 def capture_loop():
-    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+    cap = cv2.VideoCapture(CAMERA_DEVICE, cv2.CAP_V4L2)
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, W)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, H)
