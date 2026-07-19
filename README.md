@@ -36,6 +36,7 @@ Full design details, serial protocol, control laws, and bring-up checklist are i
 ## Repository contents
 
 - `ARCHITECTURE.md` — system design, protocol, vision pipeline, behavior state machines
+- `ENHANCEMENTS.md` — specced (not yet built) future work, prioritized
 - `pico_pi/` — everything that runs on the Pico. `pico_motor_controller.py` is
   the MicroPython firmware (flash as `main.py`); parses velocity commands,
   mecanum mixing, PWM output, 0.5 s safety watchdog, ultrasonic safety stop

@@ -21,6 +21,8 @@ machines, WiFi/phone API, bring-up checklist.
 ## Files
 
 - `ARCHITECTURE.md` — authoritative design doc. Keep it updated when design changes.
+- `ENHANCEMENTS.md` — prioritized specs for future work (none implemented);
+  when picking up an item from it, follow its spec and mark it done there.
 - `pico_pi/` — everything that runs on the Pico. `pico_motor_controller.py` is
   the MicroPython firmware, flashed to the Pico as `main.py`. Serial protocol
   `V vx vy w\n` (each -100..100), mecanum mixing, 0.5 s watchdog stop, plus
