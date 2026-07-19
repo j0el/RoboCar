@@ -44,6 +44,13 @@ else
     echo "    uv already installed, skipping"
 fi
 
+echo "==> Installing mpremote (flashes/runs MicroPython on the Pico over USB)"
+if ! command -v mpremote >/dev/null 2>&1; then
+    uv tool install mpremote
+else
+    echo "    mpremote already installed, skipping"
+fi
+
 echo "==> Authenticating gh with GitHub"
 if ! gh auth status >/dev/null 2>&1; then
     # Pin protocol to https + web flow so gh never prompts about SSH keys
@@ -59,5 +66,6 @@ cat <<'EOF'
   1. Clone the repo:       gh repo clone <your-github-username>/RoboCar
   2. cd RoboCar/raspberry_pi
   3. Install Python deps:  uv sync
-  4. Sanity-check vision:  uv run python hsv_tuner.py
+  4. Flash the Pico:       bash flash_pico.sh
+  5. Sanity-check vision:  uv run python hsv_tuner.py
 EOF

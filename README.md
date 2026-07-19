@@ -70,8 +70,9 @@ cd raspberry_pi
 uv sync
 ```
 
-1. Flash `pico_pi/pico_motor_controller.py` to the Pico as `main.py`
-   (pins are already confirmed against the Adeept lesson code).
+1. Flash the Pico: `bash flash_pico.sh` from `raspberry_pi/` (copies the
+   firmware as `main.py` over USB and verifies it boots; re-run after any
+   firmware change).
 2. Bench-test with wheels off the ground; flip any `DIRECTION` flag for a
    wheel spinning the wrong way. Hold a hand in front of the ultrasonic:
    forward commands should be blocked under 15 cm.

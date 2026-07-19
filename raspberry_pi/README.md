@@ -5,6 +5,11 @@ the vision/behavior programs, and their Python deps. See `../CLAUDE.md`
 and `../ARCHITECTURE.md` for what runs here and why.
 
 - `setup.sh` — one-time OS-level provisioning (see below).
+- `flash_pico.sh` — push the current firmware to the Pico over USB
+  (mpremote cp as `main.py` + reboot + telemetry check). Run after every
+  `git pull` that touches `pico_pi/pico_motor_controller.py`, with
+  cone_visitor stopped. `mpremote run <script>` runs the `pico_pi` bench
+  scripts without saving them as `main.py`.
 - `setup_ap.sh` — one-time WiFi hotspot setup for the phone controller
   (SSID `RoboCar`, password `robocar1`, Pi at `10.42.0.1`). Run with sudo.
 - `pyproject.toml` — Python deps (opencv-python-headless, pyserial, numpy), installed

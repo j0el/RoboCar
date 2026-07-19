@@ -267,23 +267,29 @@ transport in front of it changes.
    `raspberry_pi/setup.sh` (installs git, python3, gh, uv; runs
    `gh auth login`). Then `gh repo clone <you>/RoboCar`, `cd RoboCar/raspberry_pi`,
    `uv sync` to install opencv-python-headless/pyserial/numpy.
-1. **Pico pins.** Open Adeept's lesson code for your kit and copy the motor pin
-   numbers into the `PINS` table at the top of `pico_pi/pico_motor_controller.py`.
-   Flash it to the Pico (Thonny or mpremote, saved as `main.py`).
+1. **Flash the Pico.** Pins are already confirmed in
+   `pico_pi/pico_motor_controller.py`. From `raspberry_pi/`, run
+   `bash flash_pico.sh` — it copies the firmware to the Pico as `main.py`
+   over USB (via mpremote, installed by `setup.sh`), reboots it, and
+   confirms the new firmware is alive by watching for `D` telemetry.
+   Re-run it after every firmware change (stop cone_visitor first; the
+   script refuses to touch a busy port).
 1.5. **Connect Pi ↔ Pico.** Plain USB cable, Pico's micro-USB port to any Pi
    USB-A port — no GPIO wiring, no WiFi. The firmware talks over the Pico's
-   native USB CDC serial (`sys.stdin`/`print`, see `pico_motor_controller.py`),
-   the same port Thonny uses. Shows up on the Pi as `/dev/ttyACM0` (check
-   with `ls /dev/ttyACM*`). The Pico will then be powered from both the Pi's
-   USB port and the kit's battery pack simultaneously — the Pico's onboard
-   diode is designed for this, but it's worth a sanity check against the
-   Adeept expansion board's power routing the first time.
+   native USB CDC serial (`sys.stdin`/`print`, see `pico_motor_controller.py`).
+   Shows up on the Pi as `/dev/ttyACM0` (check with `ls /dev/ttyACM*`). The
+   Pico will then be powered from both the Pi's USB port and the kit's
+   battery pack simultaneously — the Pico's onboard diode is designed for
+   this, but it's worth a sanity check against the Adeept expansion board's
+   power routing the first time.
 
-   Verify the link itself before involving motors: run
-   `pico_pi/pico_serial_echo_test.py` on the Pico (Thonny "Run", don't save
-   as `main.py`), then from `raspberry_pi/`, `uv run python
-   serial_ping_test.py`. It sends `PING` a few times and confirms `PONG`
-   comes back on `/dev/ttyACM0`.
+   Verify the link itself before involving motors: run the echo test on the
+   Pico without saving it as `main.py` —
+   `mpremote run pico_pi/pico_serial_echo_test.py` — then from
+   `raspberry_pi/`, `uv run python serial_ping_test.py`. It sends `PING` a
+   few times and confirms `PONG` comes back on `/dev/ttyACM0`. (`mpremote
+   run` works headless; the other `pico_pi/*_test.py` bring-up scripts run
+   the same way.)
 2. **Bench test motors.** Wheels off the ground. From the Pi:
    `python3 -c "import serial,time; s=serial.Serial('/dev/ttyACM0',115200); s.write(b'V 30 0 0\n'); time.sleep(2); s.write(b'V 0 0 0\n')"`
    All four wheels should spin forward. Flip DIRECTION flags for any that don't.
