@@ -12,13 +12,19 @@
 #
 # Safety: if no valid command arrives for WATCHDOG_MS, all motors stop.
 #
+# Ultrasonic safety stop: the front HC-SR04 is sampled continuously. When an
+# obstacle is closer than SAFE_CM the forward component of any command is
+# forced to zero (reverse, strafe and turn still work so the robot can get
+# itself out). Each reading is reported to the Pi as a telemetry line:
+#   D <cm>\n      distance in whole cm; D -1 = no echo (nothing in range)
+#
 # BRING-UP STEP 1 complete: pins confirmed from Adeept lesson code.
 # Board uses two-PWM (IN1/IN2) H-bridge drive — see Motor class below.
 
 import sys
 import time
 import select
-from machine import Pin, PWM
+from machine import Pin, PWM, time_pulse_us
 
 # ---------------- CONFIG: EDIT THESE FOR YOUR BOARD ----------------
 # Board uses two-PWM (IN1/IN2) drive: direction is determined by which pin
@@ -38,9 +44,14 @@ PINS = {
 # Flip to -1 for any wheel that spins backward during bench test:
 DIRECTION = {"FL": 1, "FR": 1, "BL": 1, "BR": 1}
 
+ULTRA_TRIG = 3         # HC-SR04 trigger
+ULTRA_ECHO = 2         # HC-SR04 echo
+SAFE_CM = 15           # block forward motion when obstacle closer than this
+SAFE_CLEAR_CM = 20     # ...until it is at least this far away (hysteresis)
+ULTRA_PERIOD_MS = 70   # sample interval (~14 Hz)
+
 # Other board pins (for future use):
 #   Servo (camera pan "neck"): GPIO 7  -- keep at 0° (center) until needed
-#   Ultrasonic: trig=GPIO 3, echo=GPIO 2
 #   Buzzer: GPIO 26
 #   WS2812 LED (4 LEDs): GPIO 11
 #   Line tracking: left=GPIO 6, mid=GPIO 5, right=GPIO 4
@@ -75,7 +86,28 @@ class Motor:
         self.set(0)
 
 
+class Ultrasonic:
+    """Front HC-SR04. read_cm() blocks at most ~18 ms (ECHO_TIMEOUT_US)."""
+
+    ECHO_TIMEOUT_US = 18000   # ~3 m round trip; beyond that report "no echo"
+
+    def __init__(self, trig, echo):
+        self.trig = Pin(trig, Pin.OUT, value=0)
+        self.echo = Pin(echo, Pin.IN)
+
+    def read_cm(self):
+        """Distance in cm, or None if no echo within range."""
+        self.trig.value(1)
+        time.sleep_us(10)
+        self.trig.value(0)
+        t = time_pulse_us(self.echo, 1, self.ECHO_TIMEOUT_US)
+        if t < 0:              # -1/-2: no echo started or it never ended
+            return None
+        return t / 58.0        # us -> cm (speed of sound, round trip)
+
+
 motors = {name: Motor(direction=DIRECTION[name], **p) for name, p in PINS.items()}
+ultrasonic = Ultrasonic(ULTRA_TRIG, ULTRA_ECHO)
 
 
 def stop_all():
@@ -116,18 +148,26 @@ def main():
     poller.register(sys.stdin, select.POLLIN)
     buf = ""
     last_cmd = time.ticks_ms()
-    moving = False
+    last_ultra = time.ticks_ms()
+    cmd = (0, 0, 0)      # last velocity commanded by the Pi
+    blocked = False      # ultrasonic safety: forward motion suppressed
+
+    def apply_cmd():
+        vx, vy, w = cmd
+        if blocked and vx > 0:
+            vx = 0
+        apply_velocity(vx, vy, w)
 
     while True:
         # Non-blocking read of whatever serial bytes are available
         while poller.poll(0):
             ch = sys.stdin.read(1)
             if ch in ("\n", "\r"):
-                cmd = parse_line(buf)
+                parsed = parse_line(buf)
                 buf = ""
-                if cmd is not None:
-                    apply_velocity(*cmd)
-                    moving = cmd != (0, 0, 0)
+                if parsed is not None:
+                    cmd = parsed
+                    apply_cmd()
                     last_cmd = time.ticks_ms()
                     print("OK")
             else:
@@ -135,10 +175,26 @@ def main():
                 if len(buf) > 64:   # garbage guard
                     buf = ""
 
-        # Watchdog: lost the Pi -> stop
-        if moving and time.ticks_diff(time.ticks_ms(), last_cmd) > WATCHDOG_MS:
+        # Ultrasonic safety stop: sample, report, re-apply on state change
+        if time.ticks_diff(time.ticks_ms(), last_ultra) >= ULTRA_PERIOD_MS:
+            last_ultra = time.ticks_ms()
+            cm = ultrasonic.read_cm()
+            print("D -1" if cm is None else "D %d" % int(cm + 0.5))
+            was_blocked = blocked
+            if cm is not None and cm < SAFE_CM:
+                blocked = True
+            elif cm is None or cm >= SAFE_CLEAR_CM:
+                blocked = False
+            # between SAFE_CM and SAFE_CLEAR_CM: keep previous state (hysteresis)
+            if blocked != was_blocked:
+                apply_cmd()
+
+        # Watchdog: lost the Pi -> forget its last command and stop.
+        # Checks cmd (not just wheel motion) so a stale forward command being
+        # suppressed by `blocked` can't resume when the obstacle clears.
+        if cmd != (0, 0, 0) and time.ticks_diff(time.ticks_ms(), last_cmd) > WATCHDOG_MS:
+            cmd = (0, 0, 0)
             stop_all()
-            moving = False
 
         time.sleep_ms(5)
 

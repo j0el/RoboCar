@@ -9,26 +9,46 @@ vision/planning brain with a 720p USB 2.0 UVC camera (120° DFOV, forward-facing
 The Pi sends velocity commands to the Pico over USB serial; the Pico drives the
 four motors.
 
-Program 1 goal: detect orange cones and drive counterclockwise around the
-**outside** of the cone cluster (any layout — circle, square, irregular).
-Approach: reactive wall-following, keeping the nearest cone on the robot's left
-at a fixed apparent size. Read **ARCHITECTURE.md** for the full design — serial
-protocol, mecanum mixing, vision pipeline, state machine, bring-up checklist.
+Program 1 (`cone_follower.py`): detect orange cones and drive counterclockwise
+around the **outside** of the cone cluster (any layout — circle, square,
+irregular) by reactive wall-following.
+Program 2 (`cone_visitor.py`, the **master program**): visit the cones one at
+a time counterclockwise with strafe-heavy mecanum motion, controlled and
+monitored from a phone over the Pi's own WiFi AP. Read **ARCHITECTURE.md**
+for the full design — serial protocol, mecanum mixing, vision pipeline, state
+machines, WiFi/phone API, bring-up checklist.
 
 ## Files
 
 - `ARCHITECTURE.md` — authoritative design doc. Keep it updated when design changes.
 - `pico_pi/` — everything that runs on the Pico. `pico_motor_controller.py` is
   the MicroPython firmware, flashed to the Pico as `main.py`. Serial protocol
-  `V vx vy w\n` (each -100..100), mecanum mixing, 0.5 s watchdog stop. Also
-  holds bench-test/bring-up scripts (`motor_test_individual.py`,
-  `pico_movement_test.py`, `pico_serial_echo_test.py` — USB serial link test,
-  no motors) and WiFi/ESP01 experiments (`pico_esp01_test.py`,
-  `pico_esp01_diag.py`, `pico_wifi_drive.py`).
+  `V vx vy w\n` (each -100..100), mecanum mixing, 0.5 s watchdog stop, plus
+  the HC-SR04 ultrasonic safety stop (forward blocked < 15 cm) and `D <cm>`
+  distance telemetry back to the Pi. Also holds bench-test/bring-up scripts
+  (`motor_test_individual.py`, `pico_movement_test.py`,
+  `pico_serial_echo_test.py` — USB serial link test, no motors) and WiFi/ESP01
+  experiments (`pico_esp01_test.py`, `pico_esp01_diag.py`,
+  `pico_wifi_drive.py`) — the ESP01 path is superseded by the Pi-hosted AP.
 - `raspberry_pi/` — everything that runs on the Pi.
-  - `cone_follower.py` — main Pi program. OpenCV HSV cone detection,
+  - `vision.py` — shared camera setup + HSV cone detection (tuned HSV values
+    live here) used by the programs below.
+  - `cone_visitor.py` — **master program**: cone-to-cone CCW visitor state
+    machine + HTTP server on :8080 (annotated MJPEG `/stream`, `/start`,
+    `/stop`, `/drive`, `/status`) for the phone/browser. Has `--dry-run`.
+  - `cone_follower.py` — Program 1: outside-orbit wall following,
     SEARCH/FOLLOW/LOST state machine, 20 Hz command stream. Has `--dry-run`.
   - `hsv_tuner.py` — browser-based HSV tuning at http://<pi-ip>:8000 (Pi is headless).
+  - `setup_ap.sh` — one-time WiFi hotspot setup (SSID RoboCar / robocar1,
+    Pi at 10.42.0.1) via NetworkManager.
+- `sim/` — no-hardware test harnesses (run on the Mac).
+  - `pi_server_sim.py` — synthetic 2D cone world driving the REAL Visitor
+    FSM, detection, and HTTP handler from cone_visitor.py; lets the Android
+    app/browser connect to the Mac's IP:8080. Mirrors the firmware's
+    forward-block rule and counts cone contacts (any bump = behavior bug).
+  - `pico_exerciser.py` — plays the Pi's role over USB serial to a real
+    Pico: 20 Hz keyboard drive, `D` telemetry display, watchdog test.
+    Needs pyserial (`uv run --with pyserial python3 sim/pico_exerciser.py`).
   - `movement_test.py` — bench-test script that drives fixed moves over serial.
   - `serial_ping_test.py` — pairs with `pico_pi/pico_serial_echo_test.py` to
     verify the Pi<->Pico USB serial link before testing motors.
@@ -40,22 +60,16 @@ protocol, mecanum mixing, vision pipeline, state machine, bring-up checklist.
 
 ## Current state / immediate next step
 
-The code is written but **not yet run on hardware**. The blocker:
+The code is written but **not yet run on hardware** (waiting on parts to
+finalize the build). Pin assignments ARE confirmed (copied from Adeept lesson
+code into the firmware — motors, ultrasonic trig=GP3/echo=GP2, servo GP7,
+buzzer GP26, WS2812 GP11). The Adeept vendor folder is **no longer on this
+machine**; re-download the ADR032 kit archive if the original lesson code is
+needed again. USB serial Pi↔Pico is verified working.
 
-1. **The `PINS` table in `pico_pi/pico_motor_controller.py` contains PLACEHOLDER GPIO
-   numbers.** The real motor pin assignments must be copied from Adeept's
-   lesson/sample code. The Adeept docs and code are on this machine at:
-   `~/Desktop/ADR032-Omni-directional_Mecanum_Wheels_Robotic_Car_Kit_for_Pico-20260413`
-   → Find the motor driver pin definitions in their MicroPython lesson code
-   (likely a motor.py / move.py or similar in the sample code). Note whether the
-   board uses PWM+IN1+IN2 per motor or two-PWM (IN1/IN2 both PWM) drive — the
-   Motor class in the firmware currently assumes PWM+dir pins and has a comment
-   describing the two-PWM variant. Also check for a servo pin for the camera
-   pan "neck" servo (unused so far, keep at 90°/center) and note WS2812 LED,
-   buzzer, ultrasonic pins for later use.
-
-2. After pins: bench test (wheels off ground), fix `DIRECTION` flags, then HSV
-   tuning, dry run, live run — full sequence in ARCHITECTURE.md §7.
+Next steps, in order (full sequence in ARCHITECTURE.md §8): bench test motors
+(wheels off ground, fix `DIRECTION` flags), ultrasonic check, HSV tuning,
+`cone_visitor.py --dry-run`, WiFi AP + phone app check, live run.
 
 ## Conventions
 
@@ -72,5 +86,6 @@ The code is written but **not yet run on hardware**. The blocker:
 
 ## v2 backlog
 
-Ultrasonic collision backstop, lap detection/counting, outdoor lighting
-robustness, camera pan servo usage.
+Lap detection/counting, outdoor lighting robustness, camera pan servo usage,
+internet-remote control/monitoring (reuse the cone_visitor HTTP API behind a
+different transport). Ultrasonic collision backstop: done (in firmware).

@@ -3,9 +3,12 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- usesCleartextTraffic: the Pi serves plain http on the local AP;
+         Android blocks cleartext by default since API 28 -->
     <application
         android:label="RoboCar"
         android:allowBackup="false"
+        android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light.DarkActionBar">
         <activity
             android:name=".MainActivity"

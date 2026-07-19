@@ -14,7 +14,8 @@ Usage (from raspberry_pi/, deps installed via `uv sync`):
 import argparse
 import time
 import cv2
-import numpy as np
+
+from vision import FRAME_W, FRAME_H, open_camera, detect_cones
 
 try:
     import serial
@@ -22,21 +23,8 @@ except ImportError:
     serial = None
 
 # ---------------- TUNABLES ----------------
-# Camera device: a /dev/videoN index isn't stable (the Pi 4's onboard
-# bcm2835 codec/ISP nodes and camera nodes can renumber across boots/
-# replugs). Use the udev by-id symlink instead — find yours with
-# `ls -l /dev/v4l/by-id/` (the "...-video-index0" entry is the capture
-# node; "...-video-index1" is UVC metadata-only, not usable for capture).
-CAMERA_DEVICE = "/dev/v4l/by-id/usb-Innomaker_Innomaker-U20CAM-720P_SN0001-video-index0"
-
-# HSV bounds for orange, tuned with hsv_tuner.py. Wide H range (up to 67)
-# risks catching yellow/green clutter if it shows up in frame later --
-# retest with hsv_tuner.py if false positives appear outside the cone.
-HSV_LOW  = (0, 46, 239)
-HSV_HIGH = (67, 171, 255)
-
-FRAME_W, FRAME_H = 640, 480
-MIN_CONE_AREA = 300        # px^2, rejects speckle
+# Camera device and HSV bounds live in vision.py (shared with the other
+# Pi programs); tune with hsv_tuner.py.
 TARGET_BEARING = -0.45     # keep tracked cone left-of-center (-1..+1)
 TARGET_HEIGHT = 90         # px, apparent cone height = standoff distance
 BASE_FORWARD = 35          # cruise speed, -100..100
@@ -67,47 +55,6 @@ class PicoLink:
 
     def stop(self):
         self.send(0, 0, 0)
-
-
-def open_camera():
-    cap = cv2.VideoCapture(CAMERA_DEVICE, cv2.CAP_V4L2)
-    # MJPG is essential: raw YUYV at 720p won't fit through USB 2.0 at speed
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_W)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_H)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)   # always process the freshest frame
-    if not cap.isOpened():
-        raise RuntimeError(f"Camera not found at {CAMERA_DEVICE}")
-    return cap
-
-
-KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-
-
-def detect_cones(frame):
-    """Return list of dicts: {bearing, height, area}, sorted largest-first."""
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, np.array(HSV_LOW), np.array(HSV_HIGH))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, KERNEL)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, KERNEL)
-
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cones = []
-    for c in contours:
-        area = cv2.contourArea(c)
-        if area < MIN_CONE_AREA:
-            continue
-        x, y, w, h = cv2.boundingRect(c)
-        if h < w * 0.8:          # cones are taller than wide; reject flat blobs
-            continue
-        cx = x + w / 2
-        cones.append({
-            "bearing": (cx / FRAME_W) * 2 - 1,   # -1 left edge .. +1 right edge
-            "height": h,
-            "area": area,
-        })
-    cones.sort(key=lambda c: c["area"], reverse=True)
-    return cones
 
 
 def pick_target(cones):

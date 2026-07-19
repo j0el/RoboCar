@@ -95,6 +95,20 @@ Safety watchdog: if the Pico receives no valid command for 0.5 s (Pi crashed,
 cable pulled), it stops all motors. The Pi therefore streams commands
 continuously (~20 Hz) even when the values haven't changed.
 
+**Telemetry (Pico → Pi):** besides `OK` acks, the firmware samples the front
+HC-SR04 ultrasonic (~14 Hz) and streams each reading:
+
+```
+D <cm>\n      distance in whole cm; D -1 = no echo (nothing in range)
+```
+
+**Ultrasonic safety stop (on the Pico):** when an obstacle is closer than
+15 cm, the forward component of any command is forced to zero — reverse,
+strafe, and turn still work so the robot can free itself. The block releases
+with hysteresis once the obstacle is beyond 20 cm. This runs in firmware so
+it holds even if the Pi-side program misbehaves. The Pi additionally uses the
+`D` telemetry for cone-arrival detection (see §6b).
+
 ## 4. Mecanum kinematics (on the Pico)
 
 With rollers at 45°, wheel speeds are a linear mix of body velocities:
@@ -166,13 +180,84 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
 - LOST: brief pause, then back to SEARCH. Turning CCW is the right recovery
   direction since the boundary was on our left.
 
+## 6b. Behavior: cone-to-cone visitor (Program 2, `cone_visitor.py`)
+
+The master program. Instead of orbiting the cluster at a standoff, it visits
+the cones one at a time, counterclockwise, with deliberately strafe-heavy
+motion to show off the mecanum wheels. It also hosts the phone/browser UI
+(§6c).
+
+States (20 Hz loop):
+
+- **STOPPED** — autonomy off. Manual `/drive` commands from the phone are
+  honored (each expires after 0.5 s — a dead-man switch on top of the Pico's
+  own watchdog).
+- **SEARCH** — spin counterclockwise in place until a cone is seen (same
+  sweep direction as the SLIDE orbit, so a timed-out slide continues
+  naturally into a search).
+- **APPROACH** — crab toward the target cone: strafe does the centering
+  (`vy ∝ bearing`), yaw only gently trims heading, forward speed tapers as
+  the cone's apparent height grows. The result is a diagonal mecanum slide
+  rather than a car-like turn-and-drive. Frame-to-frame target association
+  is by bearing window *and* similar apparent size — size continuity stops
+  the huge just-visited cone from stealing the lock right after SLIDE.
+  Losing the target for 0.8 s falls back to SEARCH.
+- **ARRIVED** — the cone looks big enough (height ≥ 170 px) *or* the
+  ultrasonic reports ≤ 25 cm. Stop and pause 1 s.
+- **SLIDE** — orbit the visited cone counterclockwise: strafe right while
+  yawing CCW keeps the camera locked on the cone as the robot circles it
+  (cones on the left = CCW travel — program 1's insight applied to a single
+  cone; the vy:w ratio sets the orbit radius). The next cone CCW around the
+  cluster sweeps into frame from the left and crosses to the right; it is
+  accepted once clearly right of center (bearing > +0.35, so the approach
+  path swings wide of the visited cone instead of cutting through it) and
+  clearly smaller than the visited cone (no re-targeting), for 3 consecutive
+  frames. After 8 s without a candidate, spin CCW and relax the size filter.
+
+Then APPROACH the new target, forever. Lap counting stays a v2 idea.
+This behavior is exercised end-to-end by `sim/pi_server_sim.py`, which runs
+this exact state machine in a synthetic world — the acceptance-bearing and
+size-continuity rules above came out of sim runs that caught the robot
+touring clockwise, re-visiting cones, and clipping the visited cone.
+
+## 6c. WiFi access point + phone control
+
+The Pi hosts its own WiFi AP (no router needed): `raspberry_pi/setup_ap.sh`
+creates a NetworkManager hotspot — SSID **RoboCar**, WPA2 password
+**robocar1**, Pi at **10.42.0.1**. While the hotspot is up, wlan0 has no
+internet; use ethernet (or `nmcli connection down RoboCarAP`) to update code.
+
+`cone_visitor.py` embeds an HTTP server on port **8080**:
+
+| Endpoint  | Purpose                                                        |
+|-----------|----------------------------------------------------------------|
+| `/`       | Control page usable from any browser (video, start/stop, drive)|
+| `/stream` | MJPEG video annotated with cone boxes, target, state, distance |
+| `/start`  | Enable autonomy (always begins in SEARCH)                      |
+| `/stop`   | Disable autonomy (robot stops; manual drive re-enabled)        |
+| `/drive`  | `?vx=&vy=&w=` manual command; ignored while autonomy runs      |
+| `/status` | JSON: `{running, state, cones, distance_cm}`                   |
+
+The Android app (`android_controller/`) is a thin client for this API: it
+shows the MJPEG stream, START/STOP AUTO buttons, and hold-to-drive manual
+buttons that re-send `/drive` at 10 Hz while pressed. Plain platform APIs,
+no third-party dependencies. Build with `./gradlew assembleDebug`. The same
+HTTP API is the intended seam for the later internet-remote phase — only the
+transport in front of it changes.
+
 ## 7. Files
 
 | File                      | Runs on | Purpose                                    |
 |---------------------------|---------|--------------------------------------------|
-| `pico_pi/pico_motor_controller.py`      | Pico | MicroPython firmware: serial → motor PWM |
-| `raspberry_pi/cone_follower.py`         | Pi 4 | Vision + state machine + serial commands |
+| `pico_pi/pico_motor_controller.py`      | Pico | MicroPython firmware: serial → motor PWM, ultrasonic safety stop + `D` telemetry |
+| `raspberry_pi/vision.py`                | Pi 4 | Shared camera setup + HSV cone detection |
+| `raspberry_pi/cone_visitor.py`          | Pi 4 | **Master program**: cone-to-cone CCW visitor + phone/browser UI (§6b, §6c) |
+| `raspberry_pi/cone_follower.py`         | Pi 4 | Program 1: outside-orbit wall following  |
 | `raspberry_pi/hsv_tuner.py`             | Pi 4 | Browser-based live tuning of orange range|
+| `raspberry_pi/setup_ap.sh`              | Pi 4 | One-time WiFi hotspot setup (§6c)        |
+| `android_controller/`                   | Phone| Android client for the §6c HTTP API      |
+| `sim/pi_server_sim.py`                  | Mac  | Robot simulator: real FSM + detection + HTTP API against a synthetic cone world (tests the Android app, no hardware) |
+| `sim/pico_exerciser.py`                 | Mac  | Plays the Pi over USB serial to a real Pico: keyboard drive, `D` telemetry, watchdog test |
 
 ## 8. Bring-up order (do these in sequence)
 
@@ -203,15 +288,21 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
    `python3 -c "import serial,time; s=serial.Serial('/dev/ttyACM0',115200); s.write(b'V 30 0 0\n'); time.sleep(2); s.write(b'V 0 0 0\n')"`
    All four wheels should spin forward. Flip DIRECTION flags for any that don't.
    Then test strafe (`V 0 30 0`) and yaw (`V 0 0 30`).
+2.5. **Ultrasonic check.** With the firmware running, hold a hand ~10 cm in
+   front of the sensor: `V 30 0 0` should produce no motion (forward blocked),
+   while `V -30 0 0` still reverses. Watch the `D` lines on the serial port.
 3. **Tune orange.** Place cones where the robot will run. From `raspberry_pi/`,
    run `uv run python hsv_tuner.py`, open the shown URL in a browser, adjust
    sliders until cones are solid white and everything else black. Copy the
-   printed values into `cone_follower.py`.
-4. **Dry run.** From `raspberry_pi/`, run `uv run python cone_follower.py
-   --dry-run` (prints decisions, no motion) and carry the robot around by hand
-   to sanity-check detections and states.
-5. **Low-speed live run.** Default speeds are gentle. Widen the standoff and
-   raise speed only after it reliably makes full laps.
+   printed values into `vision.py`.
+4. **Dry run.** From `raspberry_pi/`, run `uv run python cone_visitor.py
+   --dry-run` (camera + web UI, no serial) and carry the robot around by hand
+   to sanity-check detections and states in the video overlay.
+5. **WiFi + phone.** Run `sudo bash setup_ap.sh` once, join the phone to the
+   `RoboCar` network, and open http://10.42.0.1:8080 (browser) or the Android
+   app. Verify video, manual drive (autonomy stopped), then START.
+6. **Low-speed live run.** Default speeds are gentle. Raise them only after
+   it reliably works the full cone circuit.
 
 ## 9. Known limitations / v2 ideas
 
@@ -221,5 +312,7 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
   can see, the robot may cut the corner. Slower speed and closer standoff help.
 - No odometry: everything is reactive. Adding lap detection (e.g., recognizing
   a start marker) would let it count laps or stop after N.
-- The kit's ultrasonic sensor is unused so far — a natural v2 is collision
-  backstop (halt if anything closer than 15 cm dead ahead).
+- The ultrasonic only looks dead ahead: strafing (SLIDE) is unprotected by it.
+  Keep the arena clear to the robot's right, or add side sensors later.
+- Internet-remote control/monitoring (beyond the local AP) is a planned later
+  phase; the §6c HTTP API is the seam it will build on.

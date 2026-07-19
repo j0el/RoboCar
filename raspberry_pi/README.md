@@ -5,9 +5,17 @@ the vision/behavior programs, and their Python deps. See `../CLAUDE.md`
 and `../ARCHITECTURE.md` for what runs here and why.
 
 - `setup.sh` — one-time OS-level provisioning (see below).
+- `setup_ap.sh` — one-time WiFi hotspot setup for the phone controller
+  (SSID `RoboCar`, password `robocar1`, Pi at `10.42.0.1`). Run with sudo.
 - `pyproject.toml` — Python deps (opencv-python-headless, pyserial, numpy), installed
   with `uv sync` run from this directory.
-- `cone_follower.py` — main program: camera capture, HSV cone detection,
+- `vision.py` — shared camera setup + HSV cone detection; the tuned HSV
+  values live here.
+- `cone_visitor.py` — **master program**: drives cone-to-cone CCW
+  (strafe-heavy) and serves the phone/browser UI on port 8080 (annotated
+  MJPEG stream, start/stop, manual drive, status). Reads the Pico's `D <cm>`
+  ultrasonic telemetry for cone arrival. `--dry-run` = camera + web UI only.
+- `cone_follower.py` — Program 1: camera capture, HSV cone detection,
   SEARCH/FOLLOW/LOST state machine, serial output to the Pico.
 - `hsv_tuner.py` — browser-based live tuning of the orange HSV range.
 - `movement_test.py` — bench-test script, drives a fixed move sequence over

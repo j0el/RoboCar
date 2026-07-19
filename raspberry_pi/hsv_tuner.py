@@ -7,7 +7,7 @@ Run on the Pi (from raspberry_pi/, deps installed via `uv sync`):
 Then open:       http://<pi-ip>:8000
 Left image = camera, right = mask. Adjust sliders until the cones are solid
 white and everything else is black. Current values print in the page and the
-terminal — copy them into HSV_LOW / HSV_HIGH in cone_follower.py.
+terminal — copy them into HSV_LOW / HSV_HIGH in vision.py.
 """
 
 import threading
@@ -16,13 +16,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
 import cv2
-import numpy as np
 
-# See cone_follower.py's CAMERA_DEVICE comment: a raw /dev/videoN index
-# isn't stable across boots/replugs, so use the udev by-id symlink.
-CAMERA_DEVICE = "/dev/v4l/by-id/usb-Innomaker_Innomaker-U20CAM-720P_SN0001-video-index0"
-W, H = 640, 480
-vals = {"hl": 5, "sl": 120, "vl": 90, "hh": 20, "sh": 255, "vh": 255}
+import vision
+
+# Sliders start from the values currently in vision.py
+vals = dict(zip(("hl", "sl", "vl"), vision.HSV_LOW))
+vals.update(zip(("hh", "sh", "vh"), vision.HSV_HIGH))
 lock = threading.Lock()
 latest = {"cam": b"", "mask": b""}
 
@@ -34,7 +33,7 @@ code{background:#333;padding:4px 8px;border-radius:4px;font-size:15px}
 </style></head><body><h2>Orange cone HSV tuner</h2>
 <div class="row"><div><h4>Camera</h4><img src="/cam"></div>
 <div><h4>Mask (cones should be solid white)</h4><img src="/mask"></div></div>
-<div id="sliders"></div><p>Copy into cone_follower.py:</p><p><code id="out"></code></p>
+<div id="sliders"></div><p>Copy into vision.py:</p><p><code id="out"></code></p>
 <script>
 const defs=[["hl","H low",0,179],["hh","H high",0,179],["sl","S low",0,255],
 ["sh","S high",0,255],["vl","V low",0,255],["vh","V high",0,255]];
@@ -55,23 +54,16 @@ show();
 
 
 def capture_loop():
-    cap = cv2.VideoCapture(CAMERA_DEVICE, cv2.CAP_V4L2)
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, W)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, H)
+    cap = vision.open_camera()
     while True:
         ok, frame = cap.read()
         if not ok:
             time.sleep(0.1)
             continue
         with lock:
-            lo = np.array([vals["hl"], vals["sl"], vals["vl"]])
-            hi = np.array([vals["hh"], vals["sh"], vals["vh"]])
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, lo, hi)
-        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k)
+            lo = (vals["hl"], vals["sl"], vals["vl"])
+            hi = (vals["hh"], vals["sh"], vals["vh"])
+        mask = vision.cone_mask(frame, lo, hi)
         _, jc = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
         _, jm = cv2.imencode(".jpg", mask, [cv2.IMWRITE_JPEG_QUALITY, 70])
         latest["cam"], latest["mask"] = jc.tobytes(), jm.tobytes()
