@@ -11,8 +11,8 @@ cluster in a **counterclockwise** direction, regardless of the cluster's shape.
 ## 1. System architecture
 
 Two-brain design. The Pi does perception and planning; the Pico does real-time
-motor actuation. They talk over a USB serial cable (the Pico is powered by the
-kit's battery pack; the Pi has its own supply).
+motor actuation. They talk over a USB serial cable. Both boards draw power
+from the same battery pack — see §2 for how the Pi is wired in.
 
 ```
 +---------------------------+          USB serial           +--------------------------+
@@ -31,7 +31,54 @@ Why not do everything on one board?
 - The Pi could drive motors directly, but that means rewiring the kit and
   losing the expansion board. Serial commands keep the kit intact.
 
-## 2. Serial protocol (Pi → Pico)
+## 2. Power distribution
+
+The kit's single 2S Li-ion battery feeds the Adeept expansion board through
+an on/off switch and a reverse-polarity diode onto a `VIN` net (see `Circuit
+Schematic.pdf`). `VIN` powers the two `DRV8833` motor drivers directly and a
+small onboard buck regulator that produces the board's logic-level `5V`
+rail — LEDs, buzzer, IR receiver, ESP8266, and the Pico's `VSYS`, the last
+via a MOSFET power-select that automatically hands the Pico off to USB power
+whenever something drives its `VBUS` (e.g. the Pi, over the serial cable).
+
+Adding the Pi 4B, three options were ruled out:
+- **Pico's USB port → Pi's USB-C.** Doesn't work: the Pico's USB port is
+  wired only as a power *input* (used to detect a USB host and disconnect
+  the battery rail from VSYS). It never sources 5V out from the battery, and
+  the Pi's USB-C port is input-only too — neither side can supply the other.
+- **Battery straight into the Pi's USB-C.** Would destroy the Pi. It has no
+  onboard buck for the pack's 7.4V nominal (6.0–8.4V range) — its power tree
+  assumes 5V already arrives regulated.
+- **Tap the onboard logic `5V` rail** (the IIC connectors `X2`–`X4`, or the
+  3-pin GPIO breakouts `X5`–`X10`). All of these are fed from the same small
+  buck regulator already shared by the Pico, ESP8266, and LEDs. A Pi 4B's
+  draw (up to 3A peak) would overload it and brown out the Pico too.
+
+**What we're doing instead:** a dedicated 5V/3A+ fixed-output buck converter,
+wired input-side to `VIN`. `VIN` is downstream of the power switch and its
+reverse-protection diode, so tapping it anywhere means the existing on/off
+switch controls the Pi's power along with everything else. The bulk caps
+`C21`/`C26` (next to the `DRV8833` chips) sit on this net but are small SMD
+cans with little solder-friendly area; the switch itself is the easier tap —
+same net, standard through-hole legs.
+
+The switch has two terminals: one wired back to the battery ("Power") jack
+(always hot whenever the battery is plugged in, regardless of switch
+position), the other wired onward to `D2`/`VIN` (only hot when the switch is
+on). Identify the `VIN`-side terminal before soldering anything: with the
+battery connected and the switch **off**, multimeter both terminals against
+GND — the one still reading battery voltage is the input side (skip it); the
+one reading 0V is the `VIN` side (tap here). Solder the buck converter's
+input wire to that terminal, GND to any convenient ground point.
+
+Output side of the buck converter goes to a USB-C power-only pigtail plugged
+into the Pi (VBUS/GND only — leave D+/D-/CC unconnected).
+
+Before connecting the Pi: reconfirm the buck converter's input reads 0V with
+the switch off and battery voltage with it on, then verify its output reads
+~5.0–5.1V under no load before plugging in the USB-C pigtail.
+
+## 3. Serial protocol (Pi → Pico)
 
 One line per command, ASCII, newline-terminated:
 
@@ -48,7 +95,7 @@ Safety watchdog: if the Pico receives no valid command for 0.5 s (Pi crashed,
 cable pulled), it stops all motors. The Pi therefore streams commands
 continuously (~20 Hz) even when the values haven't changed.
 
-## 3. Mecanum kinematics (on the Pico)
+## 4. Mecanum kinematics (on the Pico)
 
 With rollers at 45°, wheel speeds are a linear mix of body velocities:
 
@@ -63,7 +110,7 @@ Results are clipped to ±100 and scaled to PWM duty. Signs for "forward" on each
 motor depend on wiring; the firmware has per-motor DIRECTION flags to flip
 during bring-up (drive each wheel individually and correct any that spin backward).
 
-## 4. Vision pipeline (on the Pi, per frame)
+## 5. Vision pipeline (on the Pi, per frame)
 
 1. Capture 640×480 MJPG from the UVC camera (downscaled from 720p — plenty of
    detail for cones, and it keeps USB 2.0 at full frame rate).
@@ -80,7 +127,7 @@ during bring-up (drive each wheel individually and correct any that spin backwar
 No neural network needed. HSV segmentation runs 25–30 fps on a Pi 4 at this
 resolution, far faster than the robot moves.
 
-## 5. Behavior: counterclockwise outside traversal
+## 6. Behavior: counterclockwise outside traversal
 
 Key insight: going CCW around the *outside* of the cluster means the cones are
 always on the robot's **left**. The task reduces to "wall following," where the
@@ -119,7 +166,7 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
 - LOST: brief pause, then back to SEARCH. Turning CCW is the right recovery
   direction since the boundary was on our left.
 
-## 6. Files
+## 7. Files
 
 | File                      | Runs on | Purpose                                    |
 |---------------------------|---------|--------------------------------------------|
@@ -127,9 +174,11 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
 | `raspberry_pi/cone_follower.py`         | Pi 4 | Vision + state machine + serial commands |
 | `raspberry_pi/hsv_tuner.py`             | Pi 4 | Browser-based live tuning of orange range|
 
-## 7. Bring-up order (do these in sequence)
+## 8. Bring-up order (do these in sequence)
 
-0. **Pi OS setup.** On a fresh Raspberry Pi OS Lite 64-bit install, run
+0a. **Wire Pi power (see §2)** — buck converter tapped off `VIN`, USB-C
+   pigtail into the Pi — before powering on the Pi for the first time.
+0b. **Pi OS setup.** On a fresh Raspberry Pi OS Lite 64-bit install, run
    `raspberry_pi/setup.sh` (installs git, python3, gh, uv; runs
    `gh auth login`). Then `gh repo clone <you>/RoboCar`, `cd RoboCar/raspberry_pi`,
    `uv sync` to install opencv-python-headless/pyserial/numpy.
@@ -164,7 +213,7 @@ SEARCH  --cone seen-->  FOLLOW  --no cone 0.6 s-->  LOST
 5. **Low-speed live run.** Default speeds are gentle. Widen the standoff and
    raise speed only after it reliably makes full laps.
 
-## 8. Known limitations / v2 ideas
+## 9. Known limitations / v2 ideas
 
 - Lighting sensitivity: HSV bounds tuned indoors will drift outdoors. Retune,
   or move to a lightweight learned detector later.
